@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Concurrency - Fullstackgada</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0;
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            line-height: 1.2;
+        }
+
+        .header h4 {
+            margin: 10px 0 0 0;
+            font-size: clamp(0.8rem, 2.5vw, 1rem);
+            color: #666;
+        }
+
+        .header p {
+            margin: 5px 0 0 0;
+            font-size: clamp(0.8rem, 2.5vw, 1rem);
+        }
+
+        .controls {
+            padding: 15px;
+            background: #f8f9fa;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .btn {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: clamp(11px, 2.5vw, 14px);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #51cf66, #40c057);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ffd43b, #fab005);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .diagram-area {
+            padding: 15px;
+            min-height: 500px;
+            position: relative;
+        }
+
+        .scenario-title {
+            text-align: center;
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            margin-bottom: 20px;
+            font-weight: 600;
+            color: #495057;
+            padding: 0 10px;
+            line-height: 1.3;
+        }
+
+        .user-section, .server-section, .database-section {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .user, .server, .database {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            min-width: 120px;
+            flex: 1;
+            max-width: 200px;
+            transition: all 0.3s ease;
+            border: 3px solid transparent;
+        }
+
+        .user h3, .server h3, .database h3 {
+            margin: 0 0 8px 0;
+            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+        }
+
+        .user p, .server p, .database p {
+            margin: 0;
+            font-size: clamp(0.75rem, 2vw, 0.9rem);
+        }
+
+        .user {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+        }
+
+        .server {
+            background: linear-gradient(135deg, #fd79a8, #e84393);
+            color: white;
+        }
+
+        .database {
+            background: linear-gradient(135deg, #fdcb6e, #e17055);
+            color: white;
+        }
+
+        .user.active, .server.active, .database.active {
+            transform: scale(1.05);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+            border-color: #fff;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1.05); }
+            50% { transform: scale(1.1); }
+        }
+
+        .arrow {
+            position: absolute;
+            width: 3px;
+            background: #495057;
+            z-index: 10;
+            transition: all 0.5s ease;
+            opacity: 0;
+        }
+
+        .arrow.show {
+            opacity: 1;
+        }
+
+        .arrow::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: -5px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 15px solid #495057;
+        }
+
+        .message {
+            position: absolute;
+            background: #495057;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0;
+            transition: all 0.5s ease;
+            z-index: 20;
+        }
+
+        .message.show {
+            opacity: 1;
+        }
+
+        .stock-display {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 12px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            font-weight: 600;
+            border: 3px solid #51cf66;
+            font-size: clamp(0.8rem, 2.5vw, 1rem);
+            z-index: 1000;
+            min-width: 80px;
+        }
+
+        .stock-value {
+            font-size: clamp(1.2rem, 4vw, 2rem);
+            color: #51cf66;
+            text-align: center;
+            margin-top: 5px;
+        }
+
+        .log-section {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+
+        .log-title {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+        }
+
+        .log-entry {
+            background: white;
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: clamp(10px, 2vw, 12px);
+            border-left: 3px solid #667eea;
+            opacity: 0;
+            animation: fadeInUp 0.5s ease forwards;
+            word-break: break-word;
+            line-height: 1.4;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .solution-box {
+            background: linear-gradient(135deg, #51cf66, #40c057);
+            color: white;
+            padding: 15px;
+            border-radius: 15px;
+            margin: 15px 0;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+        }
+
+        .solution-box h3 {
+            margin: 0 0 8px 0;
+            font-size: clamp(1rem, 3vw, 1.2rem);
+        }
+
+        .solution-box p {
+            margin: 0;
+            font-size: clamp(0.8rem, 2.5vw, 0.95rem);
+            line-height: 1.4;
+        }
+
+        .solution-box.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .problem-indicator {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+            font-weight: 600;
+            opacity: 0;
+            animation: shake 0.5s ease;
+            font-size: clamp(0.8rem, 2.5vw, 1rem);
+            line-height: 1.3;
+        }
+
+        .problem-indicator.show {
+            opacity: 1;
+        }
+
+        .race-condition-visual {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+            opacity: 0;
+            transition: all 0.5s ease;
+        }
+
+        .race-condition-visual.show {
+            opacity: 1;
+        }
+
+        .timeline {
+            flex: 1;
+            height: 3px;
+            background: #dee2e6;
+            position: relative;
+            margin: 0 15px;
+        }
+
+        .timeline-event {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            top: -4px;
+            opacity: 0;
+            animation: timelineEvent 0.5s ease forwards;
+        }
+
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+            
+            .controls {
+                grid-template-columns: 1fr;
+                gap: 8px;
+                padding: 10px;
+            }
+            
+            .btn {
+                padding: 14px 16px;
+                font-size: 12px;
+            }
+            
+            .user-section, .server-section {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .database-section {
+                justify-content: center;
+            }
+            
+            .user, .server, .database {
+                min-width: 100px;
+                max-width: none;
+                width: 100%;
+                max-width: 300px;
+                padding: 12px;
+            }
+            
+            .stock-display {
+                position: relative;
+                top: auto;
+                right: auto;
+                margin: 10px auto;
+                display: block;
+                width: fit-content;
+            }
+            
+            .diagram-area {
+                padding: 10px;
+            }
+            
+            .log-entry {
+                font-size: 10px;
+                padding: 6px 8px;
+            }
+        }
+
+        /* Tablet styles */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .controls {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .user-section, .server-section {
+                gap: 20px;
+            }
+            
+            .stock-display {
+                top: 15px;
+                right: 15px;
+            }
+        }
+
+        /* Large screen styles */
+        @media (min-width: 1025px) {
+            .controls {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+
+        @keyframes timelineEvent {
+            to {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏪 Babita's Concurrency Issue</h1>
+            <p>Understanding Race Conditions in Web Applications</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-danger" onclick="simulateRaceCondition()">
+                🏃‍♂️ Simulate Race Condition
+            </button>
+            <button class="btn btn-success" onclick="simulateLocking()">
+                🔒 Show Locking Solution
+            </button>
+            <button class="btn btn-warning" onclick="simulateQueue()">
+                📋 Show Queue Solution
+            </button>
+            <button class="btn btn-primary" onclick="simulateOptimistic()">
+                ⚡ Show Optimistic Concurrency
+            </button>
+            <button class="btn btn-primary" onclick="resetSimulation()">
+                🔄 Reset
+            </button>
+        </div>
+
+        <div class="stock-display">
+            <div>Skin Care Stock</div>
+            <div class="stock-value" id="stockValue">1</div>
+        </div>
+
+        <div class="diagram-area">
+            <div class="scenario-title" id="scenarioTitle">Click a button above to start simulation</div>
+            
+            <div class="user-section">
+                <div class="user" id="user1">
+                    <h3>👤 User 1</h3>
+                    <p>Wants Red Saree</p>
+                </div>
+                <div class="user" id="user2">
+                    <h3>👤 User 2</h3>
+                    <p>Wants Red Saree</p>
+                </div>
+            </div>
+
+            <div class="server-section">
+                <div class="server" id="server1">
+                    <h3>🖥️ Web Server 1</h3>
+                    <p>Processing Request</p>
+                </div>
+                <div class="server" id="server2">
+                    <h3>🖥️ Web Server 2</h3>
+                    <p>Processing Request</p>
+                </div>
+            </div>
+
+            <div class="database-section">
+                <div class="database" id="database">
+                    <h3>🗄️ Database</h3>
+                    <p>Storing Inventory</p>
+                </div>
+            </div>
+
+            <div class="log-section" id="logSection" style="display: none;">
+                <div class="log-title">📊 System Logs</div>
+                <div id="logEntries"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStock = 1;
+        let simulationActive = false;
+        let logCounter = 0;
+
+        function updateStockDisplay() {
+            document.getElementById('stockValue').textContent = currentStock;
+            const stockElement = document.getElementById('stockValue');
+            if (currentStock < 0) {
+                stockElement.style.color = '#ff6b6b';
+            } else if (currentStock === 0) {
+                stockElement.style.color = '#ffd43b';
+            } else {
+                stockElement.style.color = '#51cf66';
+            }
+        }
+
+        function addLogEntry(message) {
+            const logSection = document.getElementById('logSection');
+            const logEntries = document.getElementById('logEntries');
+            logSection.style.display = 'block';
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            entry.style.animationDelay = `${logCounter * 0.1}s`;
+            logEntries.appendChild(entry);
+            logCounter++;
+        }
+
+        function activateElement(elementId, duration = 1000) {
+            const element = document.getElementById(elementId);
+            element.classList.add('active');
+            setTimeout(() => {
+                element.classList.remove('active');
+            }, duration);
+        }
+
+        function showProblemIndicator(message) {
+            const existing = document.querySelector('.problem-indicator');
+            if (existing) existing.remove();
+
+            const indicator = document.createElement('div');
+            indicator.className = 'problem-indicator show';
+            indicator.innerHTML = `⚠️ ${message}`;
+            document.querySelector('.diagram-area').appendChild(indicator);
+        }
+
+        function showSolutionBox(title, description) {
+            const existing = document.querySelector('.solution-box');
+            if (existing) existing.remove();
+
+            const box = document.createElement('div');
+            box.className = 'solution-box show';
+            box.innerHTML = `<h3>${title}</h3><p>${description}</p>`;
+            document.querySelector('.diagram-area').appendChild(box);
+        }
+
+        async function simulateRaceCondition() {
+            if (simulationActive) return;
+            simulationActive = true;
+            
+            resetSimulation(false);
+            document.getElementById('scenarioTitle').textContent = '🏃‍♂️ Race Condition Simulation';
+            
+            addLogEntry('Two users simultaneously click "Buy Now" for Red Saree');
+            
+            // Both users send requests
+            activateElement('user1', 2000);
+            activateElement('user2', 2000);
+            addLogEntry('User 1: Sending buy request...');
+            addLogEntry('User 2: Sending buy request...');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Both servers check stock simultaneously
+            activateElement('server1', 2000);
+            activateElement('server2', 2000);
+            addLogEntry('Server 1: Checking stock... Stock = 1 ✓');
+            addLogEntry('Server 2: Checking stock... Stock = 1 ✓');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Both servers try to update database
+            activateElement('database', 3000);
+            addLogEntry('Server 1: Attempting to decrease stock...');
+            addLogEntry('Server 2: Attempting to decrease stock...');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Stock becomes inconsistent
+            currentStock = -1;
+            updateStockDisplay();
+            addLogEntry('Database: Stock updated to -1 ❌');
+            addLogEntry('System: Both orders processed successfully! ❌');
+            
+            showProblemIndicator('Race Condition Detected! Same saree sold to two customers!');
+            
+            simulationActive = false;
+        }
+
+        async function simulateLocking() {
+            if (simulationActive) return;
+            simulationActive = true;
+            
+            resetSimulation(false);
+            document.getElementById('scenarioTitle').textContent = '🔒 Pessimistic Locking Solution';
+            
+            addLogEntry('Implementing database row-level locking...');
+            
+            // User 1 requests first
+            activateElement('user1', 1000);
+            addLogEntry('User 1: Sending buy request...');
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // User 2 requests
+            activateElement('user2', 3000);
+            addLogEntry('User 2: Sending buy request...');
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Server 1 gets lock
+            activateElement('server1', 2000);
+            activateElement('database', 4000);
+            addLogEntry('Server 1: Acquired lock on Red Saree row 🔒');
+            addLogEntry('Server 1: Stock = 1, processing order...');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Server 2 waits
+            activateElement('server2', 3000);
+            addLogEntry('Server 2: Waiting for lock... ⏳');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Server 1 completes transaction
+            currentStock = 0;
+            updateStockDisplay();
+            addLogEntry('Server 1: Order completed, stock = 0, lock released 🔓');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Server 2 gets lock but finds no stock
+            addLogEntry('Server 2: Acquired lock, checking stock...');
+            addLogEntry('Server 2: Stock = 0, order rejected ❌');
+            addLogEntry('User 2: "Sorry, item out of stock"');
+            
+            showSolutionBox('✅ Locking Solution', 'Database locks prevent race conditions by ensuring only one transaction can modify data at a time.');
+            
+            simulationActive = false;
+        }
+
+        async function simulateQueue() {
+            if (simulationActive) return;
+            simulationActive = true;
+            
+            resetSimulation(false);
+            document.getElementById('scenarioTitle').textContent = '📋 Message Queue Solution';
+            
+            addLogEntry('Implementing message queue for order processing...');
+            
+            // Both users send requests
+            activateElement('user1', 1000);
+            activateElement('user2', 1000);
+            addLogEntry('User 1: Request added to queue (Position: 1)');
+            addLogEntry('User 2: Request added to queue (Position: 2)');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Queue processes first request
+            activateElement('server1', 2000);
+            activateElement('database', 2000);
+            addLogEntry('Queue: Processing User 1 request...');
+            addLogEntry('Server 1: Stock = 1, processing order...');
+            
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            currentStock = 0;
+            updateStockDisplay();
+            addLogEntry('Server 1: Order completed, stock = 0');
+            addLogEntry('User 1: Order confirmed! ✅');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Queue processes second request
+            activateElement('server2', 2000);
+            addLogEntry('Queue: Processing User 2 request...');
+            addLogEntry('Server 2: Stock = 0, insufficient inventory');
+            addLogEntry('User 2: Order rejected - Out of stock ❌');
+            
+            showSolutionBox('✅ Queue Solution', 'Message queues ensure requests are processed sequentially, eliminating race conditions.');
+            
+            simulationActive = false;
+        }
+
+        async function simulateOptimistic() {
+            if (simulationActive) return;
+            simulationActive = true;
+            
+            resetSimulation(false);
+            document.getElementById('scenarioTitle').textContent = '⚡ Optimistic Concurrency Control';
+            
+            addLogEntry('Implementing optimistic locking with version control...');
+            
+            // Both users read current version
+            activateElement('user1', 1000);
+            activateElement('user2', 1000);
+            addLogEntry('User 1: Reading data (Version: 1, Stock: 1)');
+            addLogEntry('User 2: Reading data (Version: 1, Stock: 1)');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Both try to update
+            activateElement('server1', 2000);
+            activateElement('server2', 2000);
+            addLogEntry('Server 1: Attempting update with version 1...');
+            addLogEntry('Server 2: Attempting update with version 1...');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // First update succeeds
+            activateElement('database', 2000);
+            currentStock = 0;
+            updateStockDisplay();
+            addLogEntry('Database: Server 1 update successful (Version: 2, Stock: 0)');
+            addLogEntry('User 1: Order confirmed! ✅');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Second update fails due to version mismatch
+            addLogEntry('Database: Server 2 update failed - Version mismatch!');
+            addLogEntry('Server 2: Retrying with latest data...');
+            addLogEntry('Server 2: Stock = 0, order cannot be fulfilled');
+            addLogEntry('User 2: Order rejected - Out of stock ❌');
+            
+            showSolutionBox('✅ Optimistic Concurrency', 'Version-based updates detect conflicts and handle them gracefully without blocking other transactions.');
+            
+            simulationActive = false;
+        }
+
+        function resetSimulation(clearLogs = true) {
+            simulationActive = false;
+            currentStock = 1;
+            updateStockDisplay();
+            logCounter = 0;
+            
+            // Remove active states
+            document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
+            
+            // Remove indicators and solution boxes
+            document.querySelectorAll('.problem-indicator, .solution-box').forEach(el => el.remove());
+            
+            if (clearLogs) {
+                document.getElementById('logSection').style.display = 'none';
+                document.getElementById('logEntries').innerHTML = '';
+                document.getElementById('scenarioTitle').textContent = 'Click a button above to start simulation';
+            }
+        }
+
+        // Initialize
+        updateStockDisplay();
+    </script>
+</body>
+</html>
