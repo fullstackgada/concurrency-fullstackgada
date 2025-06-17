@@ -1,8 +1,8 @@
 # ⚡ Concurrency & Race Condition with Babita Ji 
 
-A fun, visual, and Hindi-based interactive demo of **Concurrency** and **Race Conditions** using the popular character **Babita Ji** from *TMKOC*. This project explains how race conditions occur in web applications and how to solve them using locking, queues, and optimistic concurrency.
+A fun, visual, and Hindi-based interactive demo of **Concurrency** and **Race Conditions** using the popular character **Babita Ji** from *TMKOC*. This project explains how race conditions occur in web applications and guides how to resolve them using locking, queues, and optimistic concurrency.
 
-🔗 **Live Demo:** [demo-concurrency.netlify.app](https://demo-concurrency.netlify.app/)
+🔗 **Live Demo:** [concurrency-fullstackgada](https://concurrency-fullstackgada.netlify.app/)
 
 ---
 
